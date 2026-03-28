@@ -47,29 +47,32 @@ Sona is a server-centric Next.js 16 application. The core principle is that **al
 ## 2. Route & Page Structure
 
 ### Public Routes (unauthenticated)
-| Route | Type | Description |
-|---|---|---|
-| `/` | Page (RSC) | Landing page — hero input, features, FAQ |
-| `/api/auth/login` | API Route | Initiates Spotify OAuth redirect |
-| `/api/auth/callback` | API Route | Handles OAuth code exchange |
+
+| Route                | Type       | Description                              |
+| -------------------- | ---------- | ---------------------------------------- |
+| `/`                  | Page (RSC) | Landing page — hero input, features, FAQ |
+| `/api/auth/login`    | API Route  | Initiates Spotify OAuth redirect         |
+| `/api/auth/callback` | API Route  | Handles OAuth code exchange              |
 
 ### Protected Routes (require session)
-| Route | Type | Description |
-|---|---|---|
-| `/profile` | Page (RSC) | Music identity portfolio — all stats sections |
-| `/chat` | Page (RSC) | Ask Sona — full chat interface |
-| `/generate` | Page (RSC) | Playlist generation — *Sprint 4* |
-| `/api/auth/logout` | API Route | Clears session and tokens |
-| `/api/spotify/top-tracks` | API Route | Top tracks (time range param) |
-| `/api/spotify/top-artists` | API Route | Top artists (time range param) |
-| `/api/spotify/recently-played` | API Route | Last 20 played tracks |
-| `/api/spotify/audio-features` | API Route | Audio features for top tracks |
-| `/api/spotify/playlists` | API Route | User's playlists |
-| `/api/ai/insights` | API Route | Daily AI insight card (streamed) |
-| `/api/ai/profile` | API Route | AI music personality profile (streamed) |
-| `/api/ai/chat` | API Route | Conversational AI (streamed) |
+
+| Route                          | Type       | Description                                   |
+| ------------------------------ | ---------- | --------------------------------------------- |
+| `/profile`                     | Page (RSC) | Music identity portfolio — all stats sections |
+| `/chat`                        | Page (RSC) | Ask Sona — full chat interface                |
+| `/generate`                    | Page (RSC) | Playlist generation — _Sprint 4_              |
+| `/api/auth/logout`             | API Route  | Clears session and tokens                     |
+| `/api/spotify/top-tracks`      | API Route  | Top tracks (time range param)                 |
+| `/api/spotify/top-artists`     | API Route  | Top artists (time range param)                |
+| `/api/spotify/recently-played` | API Route  | Last 20 played tracks                         |
+| `/api/spotify/audio-features`  | API Route  | Audio features for top tracks                 |
+| `/api/spotify/playlists`       | API Route  | User's playlists                              |
+| `/api/ai/insights`             | API Route  | Daily AI insight card (streamed)              |
+| `/api/ai/profile`              | API Route  | AI music personality profile (streamed)       |
+| `/api/ai/chat`                 | API Route  | Conversational AI (streamed)                  |
 
 ### Route Protection Strategy
+
 A single layout at `app/(protected)/layout.tsx` handles auth guarding for all dashboard routes. It reads the iron-session server-side and redirects unauthenticated users to `/` before any child page renders. Authenticated users visiting `/` are redirected to `/profile`.
 
 ---
@@ -105,13 +108,16 @@ User                 Sona Server             Spotify
 ```
 
 **Security decisions:**
+
 - `state` parameter is a cryptographic random string stored in session before redirect, verified on callback — prevents CSRF
 - Tokens are AES-256 encrypted before storage using `SESSION_SECRET` as the key. Even if the database is compromised, raw tokens are not exposed
 - `iron-session` cookie is `httpOnly`, `secure`, and `sameSite: lax`
 - Spotify scopes are minimal — only what the product actually needs (see Section 7)
 
 ### Token Refresh
+
 Every Spotify API route calls a shared `withValidToken(userId)` helper before executing. This helper:
+
 1. Reads the token record from DB and decrypts it
 2. Checks if `expires_at` is within 5 minutes
 3. If expiring soon: calls Spotify's refresh endpoint, updates DB with new tokens and new `expires_at`
@@ -126,6 +132,7 @@ Token refresh is transparent to the client — the API route handles it internal
 Managed via Drizzle ORM. All migrations are versioned in `drizzle/migrations/`.
 
 ### `users`
+
 ```sql
 id              uuid          PRIMARY KEY DEFAULT gen_random_uuid()
 spotify_id      varchar(255)  NOT NULL UNIQUE
@@ -139,6 +146,7 @@ updated_at      timestamp     NOT NULL DEFAULT now()
 ```
 
 ### `tokens`
+
 ```sql
 id              uuid          PRIMARY KEY DEFAULT gen_random_uuid()
 user_id         uuid          NOT NULL REFERENCES users(id) ON DELETE CASCADE
@@ -153,6 +161,7 @@ UNIQUE (user_id)  -- one token record per user, updated on refresh
 ```
 
 ### `spotify_cache`
+
 ```sql
 id              uuid          PRIMARY KEY DEFAULT gen_random_uuid()
 user_id         uuid          NOT NULL REFERENCES users(id) ON DELETE CASCADE
@@ -169,6 +178,7 @@ INDEX  (user_id, cache_key, expires_at)  -- fast lookup + expiry check
 ```
 
 ### `ai_cache`
+
 ```sql
 id                uuid          PRIMARY KEY DEFAULT gen_random_uuid()
 user_id           uuid          NOT NULL REFERENCES users(id) ON DELETE CASCADE
@@ -186,15 +196,16 @@ UNIQUE (user_id, cache_type)
 ```
 
 ### Cache TTL Reference
-| Data | TTL | Rationale |
-|---|---|---|
-| Top tracks / artists | 1 hour | Changes slowly; reduce Spotify API calls |
-| Recently played | 15 minutes | More dynamic; users expect freshness |
-| Playlists | 30 minutes | Changes occasionally |
-| Audio features | 6 hours | Static per-track data; rarely needs refresh |
-| AI daily insight | 24 hours | Regenerates once per day |
-| AI profile | 7 days | User can force regenerate; rate-limited |
-| Chat context | Session only | Not persisted in v1 |
+
+| Data                 | TTL          | Rationale                                   |
+| -------------------- | ------------ | ------------------------------------------- |
+| Top tracks / artists | 1 hour       | Changes slowly; reduce Spotify API calls    |
+| Recently played      | 15 minutes   | More dynamic; users expect freshness        |
+| Playlists            | 30 minutes   | Changes occasionally                        |
+| Audio features       | 6 hours      | Static per-track data; rarely needs refresh |
+| AI daily insight     | 24 hours     | Regenerates once per day                    |
+| AI profile           | 7 days       | User can force regenerate; rate-limited     |
+| Chat context         | Session only | Not persisted in v1                         |
 
 ---
 
@@ -299,16 +310,17 @@ Client sends { message: string, history: Message[] }
 
 Only the minimum scopes required are requested. This is both a security principle and a Spotify API requirement — requesting unnecessary scopes can cause app rejection during review.
 
-| Scope | Why needed |
-|---|---|
-| `user-top-read` | Top artists and tracks |
-| `user-read-recently-played` | Recently played history |
-| `playlist-read-private` | User's private playlists |
-| `playlist-read-collaborative` | Collaborative playlists |
-| `user-read-email` | Email for user record |
-| `user-read-private` | Country, Spotify product type |
+| Scope                         | Why needed                    |
+| ----------------------------- | ----------------------------- |
+| `user-top-read`               | Top artists and tracks        |
+| `user-read-recently-played`   | Recently played history       |
+| `playlist-read-private`       | User's private playlists      |
+| `playlist-read-collaborative` | Collaborative playlists       |
+| `user-read-email`             | Email for user record         |
+| `user-read-private`           | Country, Spotify product type |
 
 **Not requested (intentional):**
+
 - `playlist-modify-*` — No write operations to Spotify in v1
 - `user-library-*` — Liked songs not needed for v1
 - `streaming` — No playback
@@ -323,31 +335,32 @@ The AI layer is one of the most important parts of Sona's technical identity. Pr
 
 ```typescript
 type SonaUserContext = {
-  displayName: string
-  topTracks: { name: string; artist: string; }[]          // top 10, short term
-  topArtists: { name: string; genres: string[]; }[]       // top 10, short term
-  topArtistsLongTerm: { name: string; }[]                 // top 5, all time
-  genreBreakdown: { genre: string; weight: number; }[]    // top 5 weighted genres
+  displayName: string;
+  topTracks: { name: string; artist: string }[]; // top 10, short term
+  topArtists: { name: string; genres: string[] }[]; // top 10, short term
+  topArtistsLongTerm: { name: string }[]; // top 5, all time
+  genreBreakdown: { genre: string; weight: number }[]; // top 5 weighted genres
   audioFeatureAverages: {
-    energy: number        // 0–1
-    danceability: number  // 0–1
-    valence: number       // 0–1  (musical "happiness")
-    acousticness: number  // 0–1
-    instrumentalness: number
-    tempo: number         // BPM
-    loudness: number      // dB
-  }
-  recentlyPlayed: { name: string; artist: string; playedAt: string; }[]  // last 20
+    energy: number; // 0–1
+    danceability: number; // 0–1
+    valence: number; // 0–1  (musical "happiness")
+    acousticness: number; // 0–1
+    instrumentalness: number;
+    tempo: number; // BPM
+    loudness: number; // dB
+  };
+  recentlyPlayed: { name: string; artist: string; playedAt: string }[]; // last 20
   listeningTimePattern: {
-    morning: number       // proportion 0–1
-    afternoon: number
-    evening: number
-    lateNight: number
-  }
-}
+    morning: number; // proportion 0–1
+    afternoon: number;
+    evening: number;
+    lateNight: number;
+  };
+};
 ```
 
 ### System Prompt Principles
+
 - Sona speaks in the **second person** ("You gravitate toward..." not "The user listens to...")
 - Observations are **specific and grounded** in actual data values — no generic platitudes
 - Tone is **calm, perceptive, slightly poetic** — not clinical or chatbot-like
@@ -356,6 +369,7 @@ type SonaUserContext = {
 - Chat responses can be longer but should always **ground claims in the user's actual data**
 
 ### Caching & Cost Control
+
 - **Prompt caching:** The system prompt + user context object is the same across all chat turns in a session. Using Anthropic's prompt caching (90% discount on cache hits) keeps chat affordable.
 - **Model selection:** Claude Haiku 4.5 for all features. At estimated usage (a few dozen requests per user per month), cost is well under $0.10/user/month.
 - **AI cache:** Daily insights and profile are cached 24h/7d respectively — the most token-expensive generation only happens once per period, not on every page load.
@@ -368,17 +382,18 @@ All data fetching on the client goes through TanStack Query hooks. This provides
 
 ```typescript
 // Example hook — src/hooks/use-top-tracks.ts
-export function useTopTracks(timeRange: TimeRange = 'short_term') {
+export function useTopTracks(timeRange: TimeRange = "short_term") {
   return useQuery({
-    queryKey: ['top-tracks', timeRange],
-    queryFn: () => fetch(`/api/spotify/top-tracks?range=${timeRange}`).then(r => r.json()),
-    staleTime: 1000 * 60 * 5,   // consider fresh for 5 minutes client-side
-    gcTime:    1000 * 60 * 60,  // keep in memory for 1 hour
-  })
+    queryKey: ["top-tracks", timeRange],
+    queryFn: () => fetch(`/api/spotify/top-tracks?range=${timeRange}`).then((r) => r.json()),
+    staleTime: 1000 * 60 * 5, // consider fresh for 5 minutes client-side
+    gcTime: 1000 * 60 * 60, // keep in memory for 1 hour
+  });
 }
 ```
 
 **Query key conventions:**
+
 - `['top-tracks', timeRange]` — top tracks by time range
 - `['top-artists', timeRange]` — top artists by time range
 - `['recently-played']` — recently played
