@@ -81,3 +81,23 @@ export interface ApiError {
   error: string;
   code: string;
 }
+
+// Spotify OAuth token response
+export interface SpotifyTokenResponse {
+  access_token: string;
+  token_type: string;
+  scope: string;
+  expires_in: number;
+  refresh_token: string;
+}
+
+// Spotify user profile response
+export interface SpotifyUserProfile {
+  id: string;
+  display_name: string;
+  email: string;
+  images: { url: string; height: number; width: number }[];
+  country: string;
+  product: string;
+  external_urls: { spotify: string };
+}
