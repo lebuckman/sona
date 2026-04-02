@@ -42,7 +42,7 @@ export async function GET() {
       name: playlist.name,
       description: playlist.description ?? "",
       imageUrl: playlist.images[0]?.url ?? "",
-      trackCount: playlist.tracks?.total ?? 0,
+      trackCount: playlist.items?.total ?? 0,
       spotifyUrl: playlist.external_urls.spotify,
     }));
 

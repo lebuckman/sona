@@ -1,18 +1,16 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { withValidToken } from "@/lib/spotify/token";
 import { fetchTopArtists } from "@/lib/spotify/client";
 import { getCached, setCached, CACHE_TTL } from "@/lib/spotify/cache";
-import type { TimeRange, SpotifyArtist } from "@/types";
+import type { SpotifyArtist, TimeRange } from "@/types";
 import type { CacheKey } from "@/lib/spotify/cache";
 
 export interface TopArtistsResponse {
   artists: {
     id: string;
     name: string;
-    genres: string[];
     imageUrl: string;
-    popularity: number;
     spotifyUrl: string;
   }[];
   timeRange: TimeRange;
@@ -57,9 +55,7 @@ export async function GET(request: NextRequest) {
     const artists = response.items.map((artist: SpotifyArtist) => ({
       id: artist.id,
       name: artist.name,
-      genres: artist.genres,
       imageUrl: artist.images[0]?.url ?? "",
-      popularity: artist.popularity,
       spotifyUrl: artist.external_urls.spotify,
     }));
 

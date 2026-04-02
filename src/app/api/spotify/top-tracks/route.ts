@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { withValidToken } from "@/lib/spotify/token";
 import { fetchTopTracks } from "@/lib/spotify/client";

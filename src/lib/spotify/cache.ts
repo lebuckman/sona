@@ -13,15 +13,15 @@ export type CacheKey =
   | "top_artists:short_term"
   | "top_artists:medium_term"
   | "top_artists:long_term"
-  | "audio_features"
-  | "playlists";
+  | "playlists"
+  | "genre_breakdown";
 
 // TTL constants in milliseconds
 export const CACHE_TTL = {
   TOP_TRACKS: 60 * 60 * 1000, // 1 hour
   TOP_ARTISTS: 60 * 60 * 1000, // 1 hour
-  AUDIO_FEATURES: 6 * 60 * 60 * 1000, // 6 hours
   PLAYLISTS: 30 * 60 * 1000, // 30 minutes
+  GENRE_BREAKDOWN: 7 * 24 * 60 * 60 * 1000, // 7 days
 } as const;
 
 /**
