@@ -1,9 +1,12 @@
 # Sona — Product Requirements Document
 
-**Version:** 1.0
+**Version:** 1.1
 **Status:** Active  
-**Last Updated:** March 2026  
-**Author:** Liam Buckman
+**Last Updated:** April 2026  
+**Author:** Liam Buckman  
+**Changelog:**
+
+- v1.1: Removed audio features (Spotify deprecated Nov 2024); added Last.fm genre integration; updated Spotify field changes from Feb 2026 API changelog; noted Spotify development mode 25-user limit
 
 ---
 
@@ -53,6 +56,7 @@ There is no tool that uses AI to make listening data feel personal, expressive, 
 
 - **No music playback** — Sona surfaces insights about music, it does not play it
 - **No recently played data** — omitted to reduce API surface and token cost; Spotify natively displays this for users
+- **No audio features** — Spotify deprecated this endpoint for new apps in November 2024; genre signals are derived from Last.fm instead
 - **No social features in v1** — friend comparisons, shared profiles, and listening rooms are post-v1
 - **No Apple Music support** — Spotify-only for initial release
 - **No mobile app** — web-only; responsive design supports mobile browsers
@@ -69,189 +73,153 @@ There is no tool that uses AI to make listening data feel personal, expressive, 
 
 **Secondary:** Developers and recruiters viewing the project as a portfolio piece. The application must be immediately understandable and impressive on first load.
 
-**Persona — The Core User:**
-
-> Maya is a 22-year-old college student who listens to Spotify for 3+ hours a day. She checks her Wrapped every year and always screenshots it. She's curious about what her music says about her and would love something that explains her taste rather than just listing numbers. She doesn't want to read a dashboard — she wants to _ask a question_ and get a real answer.
+> **Note:** Sona is currently in Spotify's Development Mode, which limits access to 25 users who must be manually allowlisted in the Spotify Developer Dashboard. A quota extension request will be submitted prior to public launch.
 
 ---
 
 ## 6. Feature Breakdown
 
-### Sprint 1 — Foundation & Auth
+### Sprint 1 — Foundation & Auth ✅
 
 **Goal:** A working application where a Spotify user can log in, have their session and tokens persisted, and land on a placeholder profile page.
 
-#### F-01 · Spotify OAuth 2.0 (Authorization Code Flow)
+#### F-01 · Spotify OAuth 2.0 (Authorization Code Flow) ✅
 
 - User clicks "Connect with Spotify" and is redirected to Spotify's authorization page
 - Spotify redirects back to `/api/auth/callback` with an authorization code
 - Server exchanges code for `access_token` and `refresh_token`
-- Tokens are encrypted (AES-256) and stored in Neon Postgres — never in localStorage or client state
+- Tokens are encrypted (AES-256-GCM) and stored in Neon Postgres — never in localStorage or client state
 - Session established via `iron-session` (encrypted, server-side cookie)
 - Token refresh handled automatically on expiry (transparent to the user)
 - `state` parameter used to prevent CSRF attacks
 
-**Acceptance criteria:** A user can log in, refresh the page, and remain authenticated. Tokens visible in DB are encrypted ciphertext. Logging out clears session and tokens.
+#### F-02 · User Record Persistence ✅
 
-#### F-02 · User Record Persistence
-
-- On first login, a user record is created in the `users` table (Spotify ID, display name, email, avatar URL)
+- On first login, a user record is created in the `users` table
 - On subsequent logins, the existing record is updated (upsert)
 - Schema managed via Drizzle ORM with versioned migrations
 
-#### F-03 · Protected Route Layout
+#### F-03 · Protected Route Layout ✅
 
 - All `/profile` and `/chat` routes require an active session
 - Unauthenticated users are redirected to `/`
 - Authenticated users visiting `/` are redirected to `/profile`
 
-#### F-04 · Landing Page
-
-- Communicates Sona's value proposition clearly with a warm animated mesh gradient background
-- Rotating headline demonstrating the product's scope
-- **Hero input available to all users** — guest and authenticated alike (see F-09)
-- Floating minimal nav (no background bar — link-style navigation)
-- Two-column FAQ accordion section
-- "Connect with Spotify" CTA visible but not forced
+#### F-04 · Landing Page ✅ (placeholder — full design Sprint 4)
 
 ---
 
-### Sprint 2 — Core Stats Dashboard
+### Sprint 2 — Core Stats Data Layer ✅ (in progress)
 
-**Goal:** Authenticated users see a meaningful, AI-narrated portfolio layout populated with real Spotify data.
+**Goal:** Authenticated users have real Spotify data available via typed, cached API routes.
 
-#### F-05 · Top Tracks
+#### F-05 · Top Tracks ✅
 
-- Fetch top tracks via Spotify Web API (`/me/top/tracks`)
-- Displayed as a ranked list within the "This Month" portfolio section
-- Time range selector: Last 4 Weeks / Last 6 Months / All Time
-- Data cached in database (TTL: 1 hour) to minimize redundant API calls
+- Fetch via `/me/top/tracks` for short, medium, and long term
+- Cached in DB (1-hour TTL)
+- Transformed to lean shape before caching
 
-#### F-06 · Top Artists
+#### F-06 · Top Artists ✅
 
-- Fetch top artists via Spotify Web API (`/me/top/artists`)
-- Displayed as an editorial grid in the "Defining Voices" section
-- Same time range selector as top tracks
-- Short-term and all-time artists both fetched and used in AI context
+- Fetch via `/me/top/artists` for all time ranges
+- `genres` and `popularity` fields removed — deprecated by Spotify Feb 2026
+- Cached in DB (1-hour TTL)
 
-#### F-07 · Genre Breakdown
+#### F-07 · Genre Breakdown via Last.fm ✅
 
-- Derived from top artists' genre arrays — aggregated, deduplicated, weighted by rank
-- Displayed as animated horizontal bars within the Sound DNA section
-- Top 5 genres surfaced; feeds into AI context
+- Spotify's audio features and genre fields are deprecated for new apps
+- Artist names from cached top artists are sent to Last.fm `artist.getTopTags`
+- Tags are filtered (blocklist + count threshold + artist name exclusion) and weighted
+- Within-artist normalization removes Last.fm popularity bias
+- Claude interprets raw tags for the AI narrative — no over-engineering of filtering
+- Cached in DB (7-day TTL)
 
-#### F-08 · Audio Features Analysis
+#### F-08 · Playlists ✅
 
-- Fetch audio features for top tracks (`/audio-features`)
-- Compute averages: energy, danceability, valence, acousticness, instrumentalness, tempo, loudness
-- Displayed as a visual "sound fingerprint" in the Sound DNA section
-- These values are the primary input to AI insight and profile generation
+- Fetch via `/me/playlists`
+- `tracks` field renamed to `items` in Spotify's Feb 2026 changelog — updated
+- Cached in DB (30-minute TTL)
 
-#### F-09 · Guest AI Interaction (Landing Page)
+#### F-09 · Guest AI Interaction (Landing Page) — Sprint 3
 
-- The landing page hero input is functional for unauthenticated users
-- Guest queries receive general music intelligence responses (no personal Spotify data)
-- Example: _"Generate me a 1-hour playlist for late-night studying"_ → Claude returns a curated tracklist with reasoning
-- If a guest asks something requiring personal data, Sona surfaces a contextual sign-in prompt (non-blocking)
-- If a guest wants to act on a response (e.g., import a generated playlist), they are prompted to connect Spotify at that moment — not before
-- Guest sessions are rate-limited to prevent token abuse (see F-16)
+- Landing page hero input functional for unauthenticated users
+- General music intelligence responses (no personal Spotify data)
+- Contextual sign-in prompt when personal data is needed
+
+#### F-10 · Profile Page UI — in progress
+
+- TanStack Query provider and hooks
+- Portfolio layout with real data sections
 
 ---
 
 ### Sprint 3 — Sona AI Layer
 
-**Goal:** Transform the stats portfolio into a genuinely intelligent experience. The AI is the narrator of every section and the interface users reach for when they want to go deeper.
+**Goal:** Transform the stats portfolio into a genuinely intelligent experience.
 
-#### F-10 · Sona Voice (Inline AI Narration)
+#### F-11 · Sona Voice (Inline AI Narration)
 
-- Each portfolio section opens with a short Sona-written observation in italic serif typography
-- Rendered as a styled `SonaVoice` component — not a card or callout, but prose woven into the layout
-- Generated from the user's actual data; cached per section per day
-- Tone: second person, specific, grounded in data values, never generic
+- Each portfolio section opens with a short Sona-written observation
+- Generated from real user data; cached per section per day
+- Tone: second person, specific, grounded in data, never generic
 
-**Example (Artists section):** _"The Weeknd appears across your short-term, 6-month, and all-time charts. That kind of consistency isn't habit — it's identity."_
+#### F-12 · Sona Insights Card
 
-#### F-11 · Sona Insights Card (Overview)
+- Featured AI-generated summary at top of profile page, streamed live
+- Synthesizes top artists, genre breakdown, and listening patterns
+- Cached per user per day (24-hour TTL)
 
-- A featured AI-generated summary at the top of the profile page, streamed live
-- Synthesizes top genres, audio feature averages, and listening time patterns into a 2–4 sentence observation
-- Cached per user per day (24-hour TTL); re-generates at midnight
-- Streamed to the UI for a live typing effect
+#### F-13 · Sona Profile (Music Personality)
 
-#### F-12 · Sona Profile (Music Personality)
+- Full AI-generated music personality profile
+- Assigns a personality archetype
+- Regeneratable once per 7 days; cached with 7-day TTL
 
-- Full AI-generated music personality profile (3–5 paragraphs)
-- Assigns a personality archetype (e.g., "The Restless Explorer")
-- Structured around: genre identity, mood tendencies, listening behavior, defining artists
-- Regeneratable by user once per 7 days
-- Cached with 7-day TTL; overwritten on manual regeneration
+#### F-14 · Sona Moods (Playlist Analysis)
 
-#### F-13 · Sona Moods (Playlist Analysis)
+- Classify playlists by mood using AI interpretation of names, track counts, and genre context
+- Display as mood-tagged playlist cards
 
-- Fetch user's playlists and sample audio features from each
-- Classify each playlist into a mood: Hype / Chill / Happy / Melancholy / Focus
-- Display as mood-tagged playlist cards in the Playlists section
-- AI generates a one-line description per playlist based on its audio fingerprint
+#### F-15 · Ask Sona — Agentic Chat Interface
 
-#### F-14 · Ask Sona — Agentic Chat Interface
-
-- Dedicated `/chat` page with a full conversational interface
-- **Architecture: lightweight agentic tool use.** Rather than pre-loading all user data into context, Claude is given a set of tools it can call based on what the user asks:
-  - `get_top_tracks(timeRange)` — fetches top tracks for a given range
-  - `get_top_artists(timeRange)` — fetches top artists for a given range
-  - `get_genre_breakdown()` — returns weighted genre list
-  - `get_audio_features()` — returns audio feature averages
-  - `get_playlist_moods()` — returns playlists with mood classifications
-- Claude autonomously decides which tools to call to answer each question — this is the agentic pattern
-- Conversation history maintained client-side for the session (not persisted in v1)
-- AI responses streamed to the UI
-- Also accessible via a floating shortcut button on the profile page
-- Guest users can access a version of Ask Sona on the landing page with general (non-personal) responses
+- Dedicated `/chat` page with conversational interface
+- Claude uses tool use to fetch only the data needed per question
+- Available tools: `get_top_tracks`, `get_top_artists`, `get_genre_breakdown`, `get_playlist_moods`
+- Floating shortcut button on profile page
+- Guest version on landing page with general (non-personal) responses
 
 ---
 
 ### Sprint 4 — Polish, A11y & Deployment
 
-**Goal:** A publicly deployed, production-quality application ready for use.
-
-#### F-15 · Responsive Design
-
-- All views functional and visually coherent on mobile (≥ 375px), tablet (≥ 768px), and desktop
-- Portfolio sections reflow gracefully; charts resize correctly
-- Floating Ask Sona shortcut repositions on mobile
-
 #### F-16 · Guest Rate Limiting
 
-- Unauthenticated users are limited to 10 AI requests per hour per IP
-- Implemented via Upstash Redis + `@upstash/ratelimit` at the Vercel Edge layer
-- Requests over the limit receive a 429 response with a message prompting sign-in for unlimited access
-- Authenticated users are not rate-limited in v1
+- 10 AI requests per hour per IP via Upstash Redis at the Vercel Edge layer
 
-#### F-17 · Accessibility (A11y)
+#### F-17 · Responsive Design
 
-- All interactive elements keyboard-navigable with visible focus indicators
-- Semantic HTML throughout (correct heading hierarchy, landmark regions)
-- All images and icons have descriptive `alt` or `aria-label`
-- Color contrast meets WCAG 2.1 AA minimums
-- No motion for users with `prefers-reduced-motion` enabled
+- All views functional on mobile (≥ 375px), tablet (≥ 768px), and desktop
 
-#### F-18 · Loading, Error & Empty States
+#### F-18 · Accessibility (A11y)
 
-- Every data-fetching component has a skeleton loading state (Shadcn Skeleton)
-- API errors surface a user-friendly message with retry option
-- Empty states handled gracefully (first-time users with sparse data)
+- Keyboard navigation, semantic HTML, ARIA labels, WCAG 2.1 AA contrast
+- No motion for `prefers-reduced-motion`
 
-#### F-19 · Vercel Deployment
+#### F-19 · Loading, Error & Empty States
 
-- Project deployed to Vercel with environment variables configured
-- Preview deployments enabled for pull requests
-- `SPOTIFY_REDIRECT_URI` updated for production domain
+- Skeleton loading states for all data-fetching components
+- User-friendly error messages with retry
+- Graceful empty states for first-time users
 
-#### F-20 · README & Documentation
+#### F-20 · Vercel Deployment ✅
 
-- README: project description, tech stack, architecture summary, setup instructions, live demo link, screenshots
-- `docs/` folder contains PRD and SYSTEM_DESIGN
-- `.env.example` checked in with all required variable names (no values)
+- Live at `https://sonamusic.vercel.app`
+- Preview deployments on all PRs
+
+#### F-21 · README & Documentation ✅
+
+- README with tech stack, setup instructions, live demo link
+- `docs/` folder with PRD and SYSTEM_DESIGN
 
 ---
 
@@ -263,77 +231,56 @@ User Browser
     ▼
 Next.js 16 (App Router) — Vercel
     │
-    ├── / (landing)             Public — guest AI interaction available
+    ├── / (landing)             Public — guest AI interaction
     ├── /profile                Protected — portfolio layout, AI narration
     ├── /chat                   Protected — agentic Ask Sona interface
-    ├── /api/auth/*             OAuth routes (login, callback, logout)
-    ├── /api/spotify/*          Spotify data proxy (server-side, cached)
-    └── /api/ai/*               AI generation + agentic chat (server-side)
+    ├── /api/auth/*             OAuth routes
+    ├── /api/spotify/*          Spotify data proxy (cached)
+    ├── /api/lastfm/*           Last.fm genre data (cached)
+    └── /api/ai/*               AI generation + agentic chat
     │
     ├── Vercel Edge Middleware   Guest rate limiting (Upstash Redis)
-    ├── Spotify Web API         OAuth 2.0 + data (server-side only)
-    ├── Anthropic API           Claude Haiku 4.5 with tool use (server-side only)
-    └── Neon Postgres           Users, encrypted tokens, Spotify cache, AI cache
+    ├── Spotify Web API         OAuth 2.0 + top tracks/artists/playlists
+    ├── Last.fm API             Artist genre tags (artist.getTopTags)
+    ├── Anthropic API           Claude Haiku 4.5 with tool use
+    └── Neon Postgres           Users, tokens, Spotify cache, AI cache
          └── Drizzle ORM        Type-safe queries + versioned migrations
 ```
 
-**Key architectural principles:**
-
-- All Spotify API calls are server-side — the client never holds a Spotify access token
-- Anthropic API key is server-side only — never exposed to the browser
-- Spotify data is cached in Neon to reduce redundant API calls
-- AI-generated content is cached to control cost (insights: 24h, profile: 7d)
-- Chat context is built dynamically via tool use — Claude fetches only what it needs
-- Guest interactions hit the same AI endpoints but without personal context; rate-limited at the edge
-
 ---
 
-## 8. Data Model (High-Level)
+## 8. Data Model
 
 ```
 users
-  id                uuid, primary key
-  spotify_id        varchar, unique
-  display_name      varchar
-  email             varchar
-  avatar_url        varchar
-  country           varchar
-  spotify_product   varchar        ("premium", "free")
-  created_at        timestamp
-  updated_at        timestamp
+  id, spotify_id, display_name, email, avatar_url,
+  country, spotify_product, created_at, updated_at
 
 tokens
-  id                uuid, primary key
-  user_id           uuid, FK → users (CASCADE DELETE)
-  access_token      text (AES-256 encrypted)
-  refresh_token     text (AES-256 encrypted)
-  expires_at        timestamp
-  scope             text
-  updated_at        timestamp
+  id, user_id (FK), access_token (encrypted), refresh_token (encrypted),
+  expires_at, scope, updated_at
 
 spotify_cache
-  id                uuid, primary key
-  user_id           uuid, FK → users (CASCADE DELETE)
-  cache_key         varchar        ("top_tracks:short_term", "audio_features", etc.)
-  data              jsonb
-  cached_at         timestamp
-  expires_at        timestamp
+  id, user_id (FK), cache_key, data (jsonb), cached_at, expires_at
   UNIQUE (user_id, cache_key)
 
+  Cache keys and TTLs:
+  - top_tracks:{short|medium|long}_term  →  1 hour
+  - top_artists:{short|medium|long}_term →  1 hour
+  - playlists                            →  30 minutes
+  - genre_breakdown                      →  7 days (Last.fm tags, very stable)
+
 ai_cache
-  id                uuid, primary key
-  user_id           uuid, FK → users (CASCADE DELETE)
-  cache_type        varchar        ("daily_insight", "profile", "mood_analysis")
-  content           text
-  model             varchar
-  input_tokens      integer
-  output_tokens     integer
-  generated_at      timestamp
-  expires_at        timestamp
+  id, user_id (FK), cache_type, content, model,
+  input_tokens, output_tokens, generated_at, expires_at
   UNIQUE (user_id, cache_type)
+
+  Cache types and TTLs:
+  - daily_insight  →  24 hours
+  - profile        →  7 days
 ```
 
-**Note:** `recently_played` is intentionally omitted. Spotify surfaces this natively; including it adds API surface and token cost without meaningfully improving the AI context.
+**Note:** `recently_played` and `audio_features` are intentionally absent. Recently played is shown natively by Spotify. Audio features are deprecated for new apps as of November 2024.
 
 ---
 
@@ -346,12 +293,12 @@ ai_cache
 | Styling       | Tailwind CSS                       | v4           |
 | Components    | Shadcn UI                          | latest       |
 | Data Fetching | TanStack Query                     | v5           |
-| Charts        | Recharts                           | v2           |
 | ORM           | Drizzle ORM                        | latest       |
 | Database      | Neon Postgres                      | serverless   |
 | Session       | iron-session                       | latest       |
 | Validation    | Zod                                | latest       |
 | AI            | Anthropic Claude Haiku 4.5         | latest       |
+| Genre Data    | Last.fm API                        | v2           |
 | Rate Limiting | Upstash Redis + @upstash/ratelimit | latest       |
 | Deployment    | Vercel                             | —            |
 | CI            | GitHub Actions                     | —            |
@@ -371,39 +318,37 @@ ai_cache
 **Engineering quality**
 
 - CI pipeline is green on `main` with every commit
-- Codebase demonstrates: OAuth 2.0, encrypted token storage, database caching, agentic LLM integration, TypeScript strict mode, and edge rate limiting
+- Codebase demonstrates: OAuth 2.0, AES-256-GCM encryption, DB caching with multiple TTLs, agentic LLM integration, multi-API orchestration, TypeScript strict mode, and edge rate limiting
 - Conventional commit history is clean and readable as a project narrative
 - `docs/` folder contains up-to-date PRD and system design document
-- `.env.example` is complete and accurate
 
 ---
 
 ## 11. Sprint Timeline
 
-| Sprint   | Focus                                             | Target  |
-| -------- | ------------------------------------------------- | ------- |
-| Sprint 1 | Foundation, Auth, DB schema                       | Week 1  |
-| Sprint 2 | Core Stats + Guest AI Interaction                 | Week 2  |
-| Sprint 3 | Sona AI Layer (narration, insights, agentic chat) | Week 3  |
-| Sprint 4 | Polish, A11y, Rate Limiting, Deploy               | Week 4+ |
+| Sprint   | Focus                               | Status         |
+| -------- | ----------------------------------- | -------------- |
+| Sprint 1 | Foundation, Auth, DB schema         | ✅ Complete    |
+| Sprint 2 | Core Stats + Data Layer             | 🔄 In Progress |
+| Sprint 3 | Sona AI Layer                       | Upcoming       |
+| Sprint 4 | Polish, A11y, Rate Limiting, Deploy | Upcoming       |
 
 ---
 
 ## 12. Post-v1 Roadmap
 
-Features intentionally deferred but worth building after initial launch:
-
-- **Shareable public profile** (`/u/username`) — a public URL for your music identity page that anyone can view without signing in. A natural viral/social mechanic.
-- **Playlist generation with Spotify import** — generate a playlist via AI, then push it directly to the user's Spotify account using the `playlist-modify-public` scope
-- **Social listening rooms** — real-time WebSocket-based listening sessions with AI-enhanced activity (e.g., Sona commenting on what the group is hearing)
-- **Persistent chat history** — store conversation history per user in the database across sessions
-- **Apple Music support** — extend the data pipeline to support Apple Music's API alongside Spotify
+- **Shareable public profile** (`/u/username`) — public URL for your music identity
+- **Playlist generation with Spotify import** — AI-generated playlists pushed to Spotify
+- **Social listening rooms** — real-time WebSocket sessions with AI commentary
+- **Persistent chat history** — store conversations across sessions
+- **Apple Music support** — extend data pipeline beyond Spotify
+- **Spotify quota extension** — apply for Extended Quota Mode to remove 25-user limit
 
 ---
 
 ## 13. Open Questions
 
-- [ ] Should guest AI responses (landing page) use a lighter/faster model than authenticated responses to reduce cost? (e.g., guest → Haiku, authenticated → Sonnet)
-- [ ] Should chat history be sent as part of the tool-use message array, or maintained separately from tool results?
-- [ ] What is the Upstash Redis plan sufficient for expected guest traffic — is the free tier adequate?
-- [ ] Should the public profile page (post-v1) require opt-in from the user, or be opt-out?
+- [ ] Should guest AI responses use a lighter model than authenticated responses?
+- [ ] Should chat history be sent as part of the tool-use message array or maintained separately?
+- [ ] Should the public profile page (post-v1) require explicit opt-in from the user?
+- [ ] When should we apply for Spotify quota extension — before or after v1.0 launch?
