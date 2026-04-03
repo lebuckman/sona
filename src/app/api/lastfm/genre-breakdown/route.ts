@@ -23,7 +23,7 @@ export async function GET() {
   }
 
   try {
-    // 1Check genre breakdown cache first (24hr TTL)
+    // Check genre breakdown cache first (24hr TTL)
     const cached = await getCached<GenreEntry[]>(session.userId, "genre_breakdown");
     if (cached) {
       return NextResponse.json({ genres: cached, cached: true } satisfies GenreBreakdownResponse);

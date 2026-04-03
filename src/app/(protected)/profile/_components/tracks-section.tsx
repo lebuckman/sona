@@ -6,13 +6,14 @@ import { useTopTracks } from "@/hooks/use-top-tracks";
 import { SectionLabel } from "@/components/layout/section-label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { TIME_RANGES } from "@/lib/constants";
 import type { TimeRange } from "@/types";
 
-const TIME_RANGES: { label: string; value: TimeRange }[] = [
-  { label: "4 Weeks", value: "short_term" },
-  { label: "6 Months", value: "medium_term" },
-  { label: "All Time", value: "long_term" },
-];
+const TIME_RANGE_LABELS: Record<TimeRange, string> = {
+  short_term: "Past Month",
+  medium_term: "Past 6 Months",
+  long_term: "All Time",
+};
 
 function formatDuration(ms: number): string {
   const minutes = Math.floor(ms / 60000);
@@ -29,7 +30,7 @@ export function TracksSection() {
   return (
     <section id="tracks" aria-labelledby="tracks-heading" className="py-16">
       <div className="mb-6">
-        <SectionLabel className="mb-2">This Month</SectionLabel>
+        <SectionLabel className="mb-2">{TIME_RANGE_LABELS[timeRange]}</SectionLabel>
         <div className="flex items-end justify-between">
           <h2 id="tracks-heading" className="font-serif text-3xl font-medium tracking-tight">
             Top Tracks

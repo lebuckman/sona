@@ -3,13 +3,7 @@
 // Token management (refresh, encryption) is handled by withValidToken()
 // before these functions are ever called.
 
-import type {
-  SpotifyTrack,
-  SpotifyArtist,
-  AudioFeatures,
-  SpotifyPlaylist,
-  TimeRange,
-} from "@/types";
+import type { SpotifyTrack, SpotifyArtist, SpotifyPlaylist, TimeRange } from "@/types";
 
 const SPOTIFY_API_BASE = "https://api.spotify.com/v1";
 
@@ -66,19 +60,6 @@ interface SpotifyTopArtistsResponse {
 export async function fetchTopArtists(accessToken: string, timeRange: TimeRange, limit = 50) {
   return spotifyFetch<SpotifyTopArtistsResponse>(
     `/me/top/artists?time_range=${timeRange}&limit=${limit}`,
-    accessToken
-  );
-}
-
-// ── Audio Features ───────────────────────────────────────────────────────────
-
-interface SpotifyAudioFeaturesResponse {
-  audio_features: AudioFeatures[];
-}
-
-export async function fetchAudioFeatures(accessToken: string, trackIds: string[]) {
-  return spotifyFetch<SpotifyAudioFeaturesResponse>(
-    `/audio-features?ids=${trackIds.join(",")}`,
     accessToken
   );
 }

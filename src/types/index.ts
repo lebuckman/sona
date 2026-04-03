@@ -26,18 +26,6 @@ export interface SpotifyPlaylist {
   external_urls: { spotify: string };
 }
 
-export interface AudioFeatures {
-  id: string;
-  energy: number;
-  danceability: number;
-  valence: number;
-  acousticness: number;
-  instrumentalness: number;
-  tempo: number;
-  loudness: number;
-  speechiness: number;
-}
-
 export interface LastFmTag {
   name: string;
   count: number;

@@ -8,6 +8,7 @@ import { SonaVoice } from "@/components/sona/sona-voice";
 
 export default async function ProfilePage() {
   const session = await getSession();
+  const ownerLabel = session.displayName ? `${session.displayName}'s` : "Your";
 
   return (
     <div className="min-h-screen bg-background">
@@ -51,7 +52,7 @@ export default async function ProfilePage() {
             id="identity-heading"
             className="mb-4 font-serif text-5xl font-medium italic tracking-tight sm:text-6xl"
           >
-            {session.displayName ?? "Your"}&apos;s
+            {ownerLabel}
             <br />
             <span className="text-muted-foreground">music story.</span>
           </h1>
