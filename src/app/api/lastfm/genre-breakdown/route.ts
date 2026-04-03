@@ -43,16 +43,26 @@ export async function GET() {
     const artistsToQuery = cachedArtists.slice(0, 20);
     const artistTags: { artistRank: number; artistName: string; tags: LastFmTag[] }[] = [];
 
-    for (let i = 0; i < artistsToQuery.length; i++) {
-      const artist = artistsToQuery[i];
-      if (!artist) continue;
+    // Process in batches of 5 concurrent requests
+    const BATCH_SIZE = 5;
+    for (let batch = 0; batch < artistsToQuery.length; batch += BATCH_SIZE) {
+      const batchArtists = artistsToQuery.slice(batch, batch + BATCH_SIZE);
+      const batchResults = await Promise.all(
+        batchArtists.map(async (artist, batchIdx) => {
+          const tags = await fetchArtistTopTags(artist.name);
+          return {
+            artistRank: batch + batchIdx + 1,
+            artistName: artist.name,
+            tags,
+          };
+        })
+      );
 
-      const tags = await fetchArtistTopTags(artist.name);
-      artistTags.push({ artistRank: i + 1, artistName: artist.name, tags });
+      artistTags.push(...batchResults);
 
-      // Small delay to avoid rate limiting (Last.fm terms)
-      if (i < artistsToQuery.length - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
+      // Small delay to respect rate limiting (Last.fm terms)
+      if (batch + BATCH_SIZE < artistsToQuery.length) {
+        await new Promise((resolve) => setTimeout(resolve, 200));
       }
     }
 
