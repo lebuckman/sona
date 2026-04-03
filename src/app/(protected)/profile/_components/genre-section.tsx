@@ -6,9 +6,11 @@ import { SectionLabel } from "@/components/layout/section-label";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function GenreSection() {
-  // Fetch top artists first to warm the cache that genre breakdown depends on
-  useTopArtists("short_term");
-  const { data, isLoading } = useGenreBreakdown();
+  // Only fetch genre breakdown after top artists have loaded
+  const topArtistsQuery = useTopArtists("short_term");
+  const { data, isLoading } = useGenreBreakdown({
+    enabled: topArtistsQuery.isSuccess,
+  });
 
   const genres = data?.genres ?? [];
 

@@ -6,30 +6,30 @@ import type { LastFmTag, LastFmTagsResponse } from "@/types";
 const LASTFM_BASE = "https://ws.audioscrobbler.com/2.0/";
 
 export async function fetchArtistTopTags(artistName: string): Promise<LastFmTag[]> {
+  const apiKey = process.env.LASTFM_API_KEY;
+  if (!apiKey) return [];
+
   const params = new URLSearchParams({
     method: "artist.gettoptags",
     artist: artistName,
-    api_key: process.env.LASTFM_API_KEY as string,
+    api_key: apiKey,
     format: "json",
     autocorrect: "1", // Last.fm will correct minor spelling differences
   });
 
-  const response = await fetch(`${LASTFM_BASE}?${params.toString()}`, {
-    next: { revalidate: 0 },
-  });
-
-  if (!response.ok) {
+  try {
+    const response = await fetch(`${LASTFM_BASE}?${params.toString()}`, {
+      next: { revalidate: 0 },
+    });
     // Some artists aren't in Last.fm's database.
-    // Return empty array and let the caller handle it gracefully.
+    if (!response.ok) return [];
+
+    const data = (await response.json()) as LastFmTagsResponse | { error: number; message: string };
+    // Last.fm returns a 200 with an error field for unknown artists
+    if (!data || typeof data !== "object" || "error" in data) return [];
+
+    return data.toptags.tag ?? [];
+  } catch (error) {
     return [];
   }
-
-  const data = (await response.json()) as LastFmTagsResponse | { error: number; message: string };
-
-  // Last.fm returns a 200 with an error field for unknown artists
-  if ("error" in data) {
-    return [];
-  }
-
-  return data.toptags.tag ?? [];
 }

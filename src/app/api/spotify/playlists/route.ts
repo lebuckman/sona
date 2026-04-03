@@ -54,6 +54,9 @@ export async function GET() {
     if (error instanceof Error && error.message === "SPOTIFY_UNAUTHORIZED") {
       return NextResponse.json({ error: "Spotify session expired" }, { status: 401 });
     }
+    if (error instanceof Error && error.message.startsWith("SPOTIFY_RATE_LIMIT")) {
+      return NextResponse.json({ error: "Rate limited by Spotify" }, { status: 429 });
+    }
     console.error("Playlists error:", error);
     return NextResponse.json({ error: "Failed to fetch playlists" }, { status: 500 });
   }

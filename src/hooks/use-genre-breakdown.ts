@@ -7,10 +7,11 @@ async function fetchGenreBreakdown(): Promise<GenreBreakdownResponse> {
   return res.json() as Promise<GenreBreakdownResponse>;
 }
 
-export function useGenreBreakdown() {
+export function useGenreBreakdown(options: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["genre-breakdown"],
     queryFn: fetchGenreBreakdown,
+    enabled: options?.enabled ?? true,
     // Genre breakdown depends on top artists being cached first.
     // staleTime is longer since we cache this for 7 days server-side.
     staleTime: 1000 * 60 * 60 * 24, // 24 hours client-side
