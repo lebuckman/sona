@@ -29,7 +29,7 @@ export async function fetchArtistTopTags(artistName: string): Promise<LastFmTag[
     if (!data || typeof data !== "object" || "error" in data) return [];
 
     return data.toptags.tag ?? [];
-  } catch (error) {
+  } catch {
     return [];
   }
 }
