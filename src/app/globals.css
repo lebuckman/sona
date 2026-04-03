@@ -118,11 +118,16 @@
 }
 
 @layer base {
+  :root {
+    --font-sans: "Instrument Sans", sans-serif;
+    --font-serif: "Fraunces", serif;
+  }
   * {
     @apply border-border outline-ring/50;
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans);
   }
   html {
     @apply font-sans;
